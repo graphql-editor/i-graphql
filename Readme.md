@@ -9,7 +9,7 @@ npm i -D graphql-zeus
 ```
 
 ```sh
-npm i igraphql mongodb
+npm i i-graphql mongodb
 ```
 
 ## Generation
@@ -26,7 +26,7 @@ Now when you generated your types you can use them inside project
 
 ```ts
 import { ModelTypes } from "./zeus";
-import { iGraphQL } from "igraphql";
+import { iGraphQL } from "i-graphql";
 
 export const orm = async () => {
   const { db } = await mc();
