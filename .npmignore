@@ -1,0 +1,9 @@
+.vscode
+.DS_STORE
+.docz
+.tscache
+node_modules
+.module-cache
+src
+package-lock.json
+__tests__
