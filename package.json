@@ -1,6 +1,6 @@
 {
   "name": "i-graphql",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "private": false,
   "license": "MIT",
   "description": "GraphQL Friendly ORM for MongoDB",
