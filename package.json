@@ -1,0 +1,33 @@
+{
+  "name": "igraphql",
+  "version": "0.0.1",
+  "private": false,
+  "license": "MIT",
+  "description": "GraphQL Friendly ORM for MongoDB",
+  "main": "lib/index.js",
+  "types": "lib/index.d.ts",
+  "scripts": {
+    "build": "ttsc --build tsconfig.json",
+    "start": "ttsc --build tsconfig.json --watch"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/graphql-editor/igraphql.git"
+  },
+  "devDependencies": {
+    "@types/node": "^13.9.0",
+    "@typescript-eslint/eslint-plugin": "^4.15.0",
+    "@typescript-eslint/parser": "^4.15.0",
+    "eslint": "^7.19.0",
+    "eslint-config-prettier": "^7.2.0",
+    "eslint-plugin-prettier": "^3.3.1",
+    "prettier": "^2.0.2",
+    "ttypescript": "^1.5.12",
+    "mongodb": "^4.2.1",
+    "typescript": "^4.5.2",
+    "typescript-transform-paths": "^2.0.0"
+  },
+  "peerDependencies": {
+    "mongodb": "^4.2.1"
+  }
+}
