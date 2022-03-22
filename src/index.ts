@@ -1,4 +1,4 @@
-import { Db, OptionalId } from "mongodb";
+import { Db, OptionalId, WithId } from "mongodb";
 type AutoCreateFields = {
   [x: string]: () => any;
 };
@@ -32,10 +32,31 @@ export const iGraphQL =
       };
     };
 
+    const related = async <
+      K extends keyof O,
+      NewCollection extends keyof IGraphQL,
+      NewCollectionKey extends keyof IGraphQL[NewCollection]
+    >(
+      objects: O[],
+      k: K,
+      nK: NewCollectionKey
+    ) => {
+      type RelatedO = IGraphQL[NewCollection];
+      return db
+        .collection<RelatedO>(nK as string)
+        .find({
+          [nK]: {
+            $in: findPks(objects, k),
+          },
+        } as WithId<RelatedO>)
+        .toArray();
+    };
+
     return {
       collection,
       create,
       createWithAutoFields,
+      related,
     };
   };
 
@@ -49,3 +70,18 @@ export type MongoModel<T, Replace = {}> = NullifyObject<{
   [P in keyof Omit<T, keyof Replace>]: ToMongo<T[P]>;
 }> &
   Replace;
+
+// Extract pks relation binding from array of objects
+export const findPks = <O, K extends keyof O>(objects: O[], k: K) => {
+  type ReturnPks = O[K] extends Array<infer R> | undefined ? R : O[K];
+  const neededPks = objects
+    .map((o) => {
+      const v = o[k];
+      if (Array.isArray(v)) {
+        return v;
+      }
+      return [v];
+    })
+    .reduce((a, b) => [...a, ...b]);
+  return neededPks as ReturnPks[];
+};
