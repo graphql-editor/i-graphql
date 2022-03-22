@@ -39,11 +39,12 @@ export const iGraphQL =
     >(
       objects: O[],
       k: K,
+      relatedCollection: NewCollection,
       nK: NewCollectionKey
     ) => {
       type RelatedO = IGraphQL[NewCollection];
       return db
-        .collection<RelatedO>(nK as string)
+        .collection<RelatedO>(relatedCollection as string)
         .find({
           [nK]: {
             $in: findPks(objects, k),
