@@ -52,12 +52,66 @@ export const iGraphQL =
         } as WithId<RelatedO>)
         .toArray();
     };
+    const composeRelated = async <
+      K extends keyof O,
+      NewCollection extends keyof IGraphQL,
+      NewCollectionKey extends keyof IGraphQL[NewCollection]
+    >(
+      objects: O[],
+      k: K,
+      relatedCollection: NewCollection,
+      nK: NewCollectionKey
+    ) => {
+      const relatedObjects = await related(objects, k, relatedCollection, nK);
+      return objects.map((o) => {
+        const value = o[k];
+        if (Array.isArray(value)) {
+          return {
+            ...o,
+            [k]: value.map((valueInArray) => {
+              if (
+                typeof valueInArray === "string" ||
+                typeof valueInArray === "number"
+              ) {
+                return relatedObjects.find((ro) => {
+                  const relatedObjectKey = ro[nK as keyof typeof ro];
+                  if (
+                    typeof relatedObjectKey === "string" ||
+                    typeof relatedObjectKey === "number"
+                  ) {
+                    return relatedObjectKey === valueInArray;
+                  }
+                });
+              }
+            }),
+          };
+        }
+        if (typeof value === "string" || typeof value === "number") {
+          return {
+            ...o,
+            [k]: relatedObjects.find((ro) => {
+              const relatedObjectKey = ro[nK as keyof typeof ro];
+              if (
+                typeof relatedObjectKey === "string" ||
+                typeof relatedObjectKey === "number"
+              ) {
+                return relatedObjectKey === value;
+              }
+            }),
+          };
+        }
+        return {
+          ...o,
+        };
+      });
+    };
 
     return {
       collection,
       create,
       createWithAutoFields,
       related,
+      composeRelated,
     };
   };
 
