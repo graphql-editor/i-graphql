@@ -137,6 +137,6 @@ export const findPks = <O, K extends keyof O>(objects: O[], k: K) => {
       }
       return [v];
     })
-    .reduce((a, b) => [...a, ...b]);
+    .reduce((a, b) => [...a, ...b], []);
   return neededPks as ReturnPks[];
 };
