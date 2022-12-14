@@ -151,7 +151,10 @@ export const iGraphQL = async <
   };
 };
 
-type ToMongo<T> = T extends object[] ? string[] : T extends object ? string : T;
+type ToMongoString<T> = T extends object ? string : T;
+type ToMongo<T> = T extends Array<infer R>
+  ? ToMongoString<R>[]
+  : ToMongoString<T>;
 type Nullify<T> = T extends undefined ? undefined | null : T;
 type NullifyObject<T> = {
   [P in keyof T]: Nullify<T[P]>;
