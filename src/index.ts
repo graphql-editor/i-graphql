@@ -1,4 +1,4 @@
-import { Db, OptionalId, WithId } from "mongodb";
+import { Db, MongoClient, WithId, OptionalUnlessRequiredId } from "mongodb";
 type AutoCreateFields = {
   [x: string]: () => any;
 };
@@ -7,16 +7,48 @@ type SharedKeys<AutoTypes, MTypes> = {
   [P in keyof AutoTypes]: P extends keyof MTypes ? P : never;
 }[keyof AutoTypes];
 
-export const iGraphQL =
-  <IGraphQL, CreateFields extends AutoCreateFields = {}>(
-    db: Db,
-    autoFields: CreateFields
-  ) =>
-  <T extends keyof IGraphQL>(k: T extends string ? T : never) => {
+let mongoConnection: { db: Db; client: MongoClient } | undefined = undefined;
+
+const mc = async (afterConnection?: (database: Db) => void) => {
+  if (mongoConnection) {
+    return Promise.resolve(mongoConnection);
+  }
+  const mongoURL = process.env.MONGO_URL;
+  if (!mongoURL) {
+    throw new Error("Please provide MONGO_URL environment variable");
+  }
+  const client = new MongoClient(mongoURL, {
+    ignoreUndefined: true,
+  });
+  const c = await client.connect();
+  const db = c.db();
+  const dbName = db.databaseName;
+  if (!dbName || dbName === "test") {
+    throw new Error(
+      "Provide database name inside MONGO_URL to work with iGraphQL. 'test' is also not accepted"
+    );
+  }
+  mongoConnection = {
+    client,
+    db,
+  };
+  afterConnection?.(db);
+  return mongoConnection;
+};
+
+export const iGraphQL = async <
+  IGraphQL extends Record<string, any>,
+  CreateFields extends AutoCreateFields = {}
+>(
+  autoFields: CreateFields,
+  afterConnection?: (database: Db) => void
+) => {
+  const { db } = await mc(afterConnection);
+  return <T extends keyof IGraphQL>(k: T extends string ? T : never) => {
     type O = IGraphQL[T];
     const collection = db.collection<O>(k);
-    const create = (params: OptionalId<O>) => {
-      return db.collection<O>(k).insertOne(params);
+    const create = (params: OptionalUnlessRequiredId<O>) => {
+      return collection.insertOne(params);
     };
     const createWithAutoFields = <Z extends SharedKeys<CreateFields, O>>(
       ...keys: Array<Z>
@@ -27,8 +59,11 @@ export const iGraphQL =
         a[b] = autoFields[b]();
         return a;
       }, {});
-      return (params: Omit<OptionalId<O>, Z>) => {
-        return create({ ...params, ...createdFields } as OptionalId<O>);
+      return (params: Omit<OptionalUnlessRequiredId<O>, Z>) => {
+        return create({
+          ...params,
+          ...createdFields,
+        } as OptionalUnlessRequiredId<O>);
       };
     };
 
@@ -68,7 +103,7 @@ export const iGraphQL =
         if (Array.isArray(value)) {
           return {
             ...o,
-            [k]: value.map((valueInArray) => {
+            [k]: value.map((valueInArray: unknown) => {
               if (
                 typeof valueInArray === "string" ||
                 typeof valueInArray === "number"
@@ -114,6 +149,7 @@ export const iGraphQL =
       composeRelated,
     };
   };
+};
 
 type ToMongo<T> = T extends object[] ? string[] : T extends object ? string : T;
 type Nullify<T> = T extends undefined ? undefined | null : T;

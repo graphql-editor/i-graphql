@@ -29,7 +29,6 @@ import { ModelTypes } from "./zeus";
 import { iGraphQL } from "i-graphql";
 
 export const orm = async () => {
-  const { db } = await mc();
   return iGraphQL<
     Pick<ModelTypes, "Operation" | "Invoice" | "Source">,
     {
@@ -37,7 +36,7 @@ export const orm = async () => {
       createdAt: () => string;
       updatedAt: () => string;
     }
-  >(db, {
+  >({
     _id: () => new ObjectId().toHexString(),
     createdAt: () => new Date().toISOString(),
     updatedAt: () => new Date().toISOString(),
