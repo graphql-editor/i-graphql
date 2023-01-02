@@ -32,7 +32,7 @@ const mc = async (afterConnection?: (database: Db) => void) => {
     client,
     db,
   };
-  afterConnection?.(db);
+  await afterConnection?.(db);
   return mongoConnection;
 };
 
