@@ -42,18 +42,18 @@ export const orm = async () => {
     updatedAt: () => new Date().toISOString(),
   });
 };
+
+export const MongOrb = await orm();
 ```
 
 ### How to use your orm
 
 ```ts
 const resolver = () =>
-  orm().then((o) =>
-    o("Source").createWithAutoFields(
-      "_id",
-      "createdAt"
-    )({
-      name: "My Source",
-    })
-  );
+  MongOrb("Source").createWithAutoFields(
+    "_id",
+    "createdAt"
+  )({
+    name: "My Source",
+  });
 ```
