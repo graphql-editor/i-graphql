@@ -1,13 +1,10 @@
 const STANDARD_TTL_IN_MILLISECONDS = 3000;
 
-const dataLoaderCache: Record<
-  string,
-  { value: any; createdAt: number; ttl: number }
-> = {};
+const dataLoaderCache: Record<string, { value: any; createdAt: number; ttl: number }> = {};
 
 export const setToCache = (key: string, value: any, ttl?: number) => {
   dataLoaderCache[key] = {
-    ttl: typeof ttl === "undefined" ? STANDARD_TTL_IN_MILLISECONDS : ttl,
+    ttl: typeof ttl === 'undefined' ? STANDARD_TTL_IN_MILLISECONDS : ttl,
     createdAt: new Date().valueOf(),
     value,
   };
