@@ -1,4 +1,6 @@
-import { Db, MongoClient, WithId, OptionalUnlessRequiredId } from "mongodb";
+import { getFromCache, setToCache } from "@/cacheFunctions";
+import { mc } from "@/db";
+import { Db, WithId, OptionalUnlessRequiredId } from "mongodb";
 type AutoCreateFields = {
   [x: string]: () => any;
 };
@@ -6,35 +8,6 @@ type AutoCreateFields = {
 type SharedKeys<AutoTypes, MTypes> = {
   [P in keyof AutoTypes]: P extends keyof MTypes ? P : never;
 }[keyof AutoTypes];
-
-let mongoConnection: { db: Db; client: MongoClient } | undefined = undefined;
-
-const mc = async (afterConnection?: (database: Db) => void) => {
-  if (mongoConnection) {
-    return Promise.resolve(mongoConnection);
-  }
-  const mongoURL = process.env.MONGO_URL;
-  if (!mongoURL) {
-    throw new Error("Please provide MONGO_URL environment variable");
-  }
-  const client = new MongoClient(mongoURL, {
-    ignoreUndefined: true,
-  });
-  const c = await client.connect();
-  const db = c.db();
-  const dbName = db.databaseName;
-  if (!dbName || dbName === "test") {
-    throw new Error(
-      "Provide database name inside MONGO_URL to work with iGraphQL. 'test' is also not accepted"
-    );
-  }
-  mongoConnection = {
-    client,
-    db,
-  };
-  await afterConnection?.(db);
-  return mongoConnection;
-};
 
 export const iGraphQL = async <
   IGraphQL extends Record<string, any>,
@@ -44,7 +17,15 @@ export const iGraphQL = async <
   afterConnection?: (database: Db) => void
 ) => {
   const { db } = await mc(afterConnection);
-  return <T extends keyof IGraphQL>(k: T extends string ? T : never) => {
+  return <T extends keyof IGraphQL>(
+    k: T extends string ? T : never,
+    cache?: {
+      //custom ttl for caching this object in database for functions: list, oneByID - default is 3000ms
+      ttl?: number;
+      //setting this allows to use list responses project the individual object cache.
+      listPrimaryKey?: string;
+    }
+  ) => {
     type O = IGraphQL[T];
     const collection = db.collection<O>(k);
     const create = (params: OptionalUnlessRequiredId<O>) => {
@@ -141,10 +122,68 @@ export const iGraphQL = async <
       });
     };
 
+    //method to get one object by Id using data loader cache
+    const oneById = async (
+      ...params: Parameters<typeof collection["findOne"]>
+    ) => {
+      // if we have the list primary key we need to check the cache only by using this key
+      if (cache?.listPrimaryKey) {
+        let fetchingFromCacheAllowed = true;
+        const valueFromCache = getFromCache(
+          JSON.stringify({
+            [cache.listPrimaryKey]: params[0][cache.listPrimaryKey],
+          })
+        );
+        if (valueFromCache) {
+          Object.entries(params[0]).forEach(([entryKey, entryValue]) => {
+            if (valueFromCache[entryKey] !== entryValue) {
+              fetchingFromCacheAllowed = false;
+            }
+          });
+          if (fetchingFromCacheAllowed) {
+            return valueFromCache;
+          }
+        }
+      } else {
+        const paramKey = JSON.stringify(params[0]);
+        const valueFromCache = getFromCache(paramKey);
+        if (valueFromCache) return valueFromCache;
+        const result = await collection.findOne(...params);
+        collection.findOne({});
+        setToCache(paramKey, result, cache?.ttl);
+        return result;
+      }
+    };
+
+    //method to get list of objects - working with inner cache. Calls toArray at the end so you don't have to.
+    const list = async (...params: Parameters<typeof collection["find"]>) => {
+      const paramKey = JSON.stringify(params[0]);
+      const valueFromCache = getFromCache(paramKey);
+      if (valueFromCache) return valueFromCache;
+      const result = await collection.find(...params).toArray();
+      setToCache(paramKey, result, cache?.ttl);
+      if (cache?.listPrimaryKey) {
+        for (const individual of result) {
+          if (individual[cache.listPrimaryKey]) {
+            setToCache(
+              JSON.stringify({
+                [cache.listPrimaryKey]: individual[cache.listPrimaryKey],
+              }),
+              individual,
+              cache.ttl
+            );
+          }
+        }
+      }
+      return result;
+    };
+
     return {
       collection,
       create,
       createWithAutoFields,
+      list,
+      oneById,
       related,
       composeRelated,
     };
