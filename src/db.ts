@@ -1,17 +1,21 @@
 import { Db, MongoClient } from 'mongodb';
 let mongoConnection: { db: Db; client: MongoClient } | undefined = undefined;
 
-export const mc = async (afterConnection?: (database: Db) => void) => {
+export const mc = async (props: { afterConnection?: (database: Db) => void; mongoClient?: MongoClient }) => {
+  const { afterConnection, mongoClient } = props;
   if (mongoConnection) {
     return Promise.resolve(mongoConnection);
   }
-  const mongoURL = process.env.MONGO_URL;
-  if (!mongoURL) {
+  const resolvedMongoUrl = process.env.MONGO_URL;
+  let client: MongoClient | undefined = mongoClient;
+  if (resolvedMongoUrl && !client) {
+    client = new MongoClient(resolvedMongoUrl, {
+      ignoreUndefined: true,
+    });
+  }
+  if (!client) {
     throw new Error('Please provide MONGO_URL environment variable');
   }
-  const client = new MongoClient(mongoURL, {
-    ignoreUndefined: true,
-  });
   const c = await client.connect();
   const db = c.db();
   const dbName = db.databaseName;

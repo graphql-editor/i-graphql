@@ -1,23 +1,11 @@
-const STANDARD_TTL_IN_MILLISECONDS = 3000;
-
-const dataLoaderCache: Record<string, { value: any; createdAt: number; ttl: number }> = {};
-
-export const setToCache = (key: string, value: any, ttl?: number) => {
-  dataLoaderCache[key] = {
-    ttl: typeof ttl === 'undefined' ? STANDARD_TTL_IN_MILLISECONDS : ttl,
-    createdAt: new Date().valueOf(),
-    value,
-  };
+const promises: Record<string, Promise<any> | undefined> = {};
+const setToPromise = <PromiseType>(key: string, value: () => Promise<PromiseType>) => {
+  const promise = value();
+  promises[key] = promise;
+  return promise;
 };
 
-export const getFromCache = (key: string) => {
-  const isInCache = dataLoaderCache[key];
-  if (!isInCache) return;
-  const now = new Date().valueOf();
-  const expired = now - isInCache.createdAt > isInCache.ttl;
-  if (expired) {
-    delete dataLoaderCache[key];
-    return;
-  }
-  return isInCache.value;
+export const getFromPromise = <PromiseType>(key: string, fn: () => Promise<PromiseType>) => {
+  if (promises[key]) return promises[key] as Promise<PromiseType>;
+  return setToPromise(key, fn);
 };
