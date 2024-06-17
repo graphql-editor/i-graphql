@@ -1,4 +1,4 @@
-import { getFromPromise } from '@/cacheFunctions';
+import { clearPromises, getFromPromise } from '@/cacheFunctions';
 import { mc } from '@/db';
 import { Db, WithId, OptionalUnlessRequiredId, MongoClient } from 'mongodb';
 type AutoCreateFields = {
@@ -26,13 +26,23 @@ export const iGraphQL = async <
 ) => {
   const { autoFields, afterConnection, mongoClient } = props;
   const { db } = await mc({ afterConnection, mongoClient });
+  clearPromises();
   return <T extends keyof IGraphQL>(k: T extends string ? T : never) => {
     type PK = IGraphQL[T][(typeof primaryKeys)[T]];
     type O = IGraphQL[T];
     const collection = db.collection<O>(k);
     type CurrentCollection = typeof collection;
-    const create = (params: OptionalUnlessRequiredId<O>) => {
-      return collection.insertOne(params);
+    const primaryKey = primaryKeys[k] as string;
+    const create = async (params: OptionalUnlessRequiredId<O>) => {
+      const result = await collection.insertOne(params);
+      await getFromPromise(
+        k,
+        JSON.stringify({
+          [primaryKey]: params[primaryKey],
+        }),
+        async () => params,
+      );
+      return result;
     };
     const createWithAutoFields = <Z extends SharedKeys<CreateFields, O>>(...keys: Array<Z>) => {
       const createdFields = keys.reduce<{
@@ -118,11 +128,10 @@ export const iGraphQL = async <
     const oneByPk = async (pkValue: PK): Promise<WithId<O> | null | undefined> => {
       // if we have the list primary key we need to check the cache only by using this key
       const paramKey = JSON.stringify({
-        [primaryKeys[k]]: pkValue,
+        [primaryKey]: pkValue,
       });
-      return getFromPromise(paramKey, () => {
-        console.log(paramKey, 'CALLED');
-        return collection.findOne({ [primaryKeys[k] as any]: pkValue });
+      return getFromPromise(k, paramKey, () => {
+        return collection.findOne({ [primaryKey as any]: pkValue });
       });
     };
 
@@ -130,12 +139,13 @@ export const iGraphQL = async <
     //method to get list of objects - working with inner cache. Calls toArray at the end so you don't have to.
     const list = async (...params: Parameters<CurrentCollectionFindType>): Promise<WithId<O>[]> => {
       const paramKey = JSON.stringify(params[0]);
-      const result = await getFromPromise(paramKey, () => collection.find(...params).toArray());
+      const result = await getFromPromise(k, paramKey, () => collection.find(...params).toArray());
       for (const individual of result) {
         if (individual[primaryKeys[k] as string]) {
           getFromPromise(
+            k,
             JSON.stringify({
-              [primaryKeys[k]]: individual[primaryKeys[k] as string],
+              [primaryKey]: individual[primaryKey],
             }),
             async () => individual,
           );

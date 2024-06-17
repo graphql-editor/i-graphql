@@ -55,7 +55,6 @@ describe('Testing i-graphql with mongodb in memory module', () => {
       title: 'aaa',
     });
     await MongoOrb('Todo').list({});
-    console.log('AAAAAA');
     const resultPk = await MongoOrb('Todo').oneByPk(resultInsert.insertedId);
     expect(resultPk?._id).toEqual(resultInsert.insertedId);
   });
