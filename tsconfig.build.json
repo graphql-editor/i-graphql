@@ -1,4 +1,7 @@
 {
   "extends":"./tsconfig.json",
+  "compilerOptions": {
+    "rootDir": "./src"
+  },
   "exclude": ["lib", "node_modules", "docs", "generated", "examples","**/*.test.ts","vitest.config.ts"]
 }
