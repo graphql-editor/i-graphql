@@ -16,17 +16,12 @@ const iGraphQLClient = async () => {
     {
       _id: () => string;
     }
-  >(
-    {
-      Todo: '_id',
+  >({
+    autoFields: {
+      _id: () => new ObjectId().toHexString(),
     },
-    {
-      autoFields: {
-        _id: () => new ObjectId().toHexString(),
-      },
-      mongoClient: client,
-    },
-  );
+    mongoClient: client,
+  });
   return MongoOrb;
 };
 
@@ -45,17 +40,5 @@ describe('Testing i-graphql with mongodb in memory module', () => {
       title,
     });
     expect(result.insertedId).toBeTruthy();
-    const resultFetch = await MongoOrb('Todo').oneByPk(result.insertedId);
-    expect(resultFetch?._id).toEqual(result.insertedId);
-    expect(resultFetch?.title).toEqual(title);
-  });
-  it('should have the same id in list and oneByPk method while calling the db only once', async () => {
-    const MongoOrb = await iGraphQLClient();
-    const resultInsert = await MongoOrb('Todo').createWithAutoFields('_id')({
-      title: 'aaa',
-    });
-    await MongoOrb('Todo').list({});
-    const resultPk = await MongoOrb('Todo').oneByPk(resultInsert.insertedId);
-    expect(resultPk?._id).toEqual(resultInsert.insertedId);
   });
 });

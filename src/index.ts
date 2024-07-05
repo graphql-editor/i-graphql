@@ -1,4 +1,4 @@
-import { clearPromises, getFromPromise } from '@/cacheFunctions';
+import { clearPromises } from '@/cacheFunctions';
 import { mc } from '@/db';
 import { Db, WithId, OptionalUnlessRequiredId, MongoClient } from 'mongodb';
 type AutoCreateFields = {
@@ -12,36 +12,20 @@ type SharedKeys<AutoTypes, MTypes> = {
 export const iGraphQL = async <
   IGraphQL extends Record<string, Record<string, any>>,
   CreateFields extends AutoCreateFields = {},
->(
-  //setting this allows to use list responses project the individual object cache.
-  primaryKeys: {
-    [P in keyof IGraphQL]: keyof IGraphQL[P];
-  },
-  props: {
-    autoFields: CreateFields;
-    afterConnection?: (database: Db) => void;
-    // override the process.env.MONGO_URL variable
-    mongoClient?: MongoClient;
-  },
-) => {
+>(props: {
+  autoFields: CreateFields;
+  afterConnection?: (database: Db) => void;
+  // override the process.env.MONGO_URL variable
+  mongoClient?: MongoClient;
+}) => {
   const { autoFields, afterConnection, mongoClient } = props;
   const { db } = await mc({ afterConnection, mongoClient });
   clearPromises();
-  return <T extends keyof IGraphQL>(k: T extends string ? T : never) => {
-    type PK = IGraphQL[T][(typeof primaryKeys)[T]];
+  return <T extends keyof IGraphQL>(k: T) => {
     type O = IGraphQL[T];
-    const collection = db.collection<O>(k);
-    type CurrentCollection = typeof collection;
-    const primaryKey = primaryKeys[k] as string;
+    const collection = db.collection<O>(k as string);
     const create = async (params: OptionalUnlessRequiredId<O>) => {
       const result = await collection.insertOne(params);
-      await getFromPromise(
-        k,
-        JSON.stringify({
-          [primaryKey]: params[primaryKey],
-        }),
-        async () => params,
-      );
       return result;
     };
     const createWithAutoFields = <Z extends SharedKeys<CreateFields, O>>(...keys: Array<Z>) => {
@@ -124,42 +108,10 @@ export const iGraphQL = async <
       });
     };
 
-    //method to get one object by Id using data loader cache
-    const oneByPk = async (pkValue: PK): Promise<WithId<O> | null | undefined> => {
-      // if we have the list primary key we need to check the cache only by using this key
-      const paramKey = JSON.stringify({
-        [primaryKey]: pkValue,
-      });
-      return getFromPromise(k, paramKey, () => {
-        return collection.findOne({ [primaryKey as any]: pkValue });
-      });
-    };
-
-    type CurrentCollectionFindType = CurrentCollection['find'];
-    //method to get list of objects - working with inner cache. Calls toArray at the end so you don't have to.
-    const list = async (...params: Parameters<CurrentCollectionFindType>): Promise<WithId<O>[]> => {
-      const paramKey = JSON.stringify(params[0]);
-      const result = await getFromPromise(k, paramKey, () => collection.find(...params).toArray());
-      for (const individual of result) {
-        if (individual[primaryKeys[k] as string]) {
-          getFromPromise(
-            k,
-            JSON.stringify({
-              [primaryKey]: individual[primaryKey],
-            }),
-            async () => individual,
-          );
-        }
-      }
-      return result;
-    };
-
     return {
       collection,
       create,
       createWithAutoFields,
-      list,
-      oneByPk,
       related,
       composeRelated,
     };

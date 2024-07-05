@@ -70,17 +70,64 @@ const resolver = () =>
 ## Experimental data loader
 
 You can use experimental data loader for requests that can cause n+1 problem. It is still in experimental phase.
+Consider the following schema
+```graphql
+type Person{
+  id: String!
+  username:String!
+  friends: [Person!]!
+}
 
-
-## List objects
-```ts
-const result = await MongoOrb("Source").list({})
+type Query{
+  person(_id:String!): Person!
+}
 ```
 
-This will return list of objects but also make resolved promise for each of _id contained inside list. So later during the same GraphQL query if you request some object:
+And the following query:
 
-```ts
-const result = await MongoOrb("Source").oneByPk("892194hruh8hasd")
+```gql
+query GetPersonWithFriends{
+  person(id:"38u198rh89h"){
+    username
+    id
+    friends{
+      username
+      id
+      friends{
+        username
+        id
+      }
+    }
+  }
+}
 ```
 
-It will load the object from promise instead of calling the database
+Here is how you can implement to limit db calls and avoid n+1 problem
+
+```ts
+const peopleLoader = dataLoader<{[id:string]: PersonModel}>({})
+
+export const QueryPeople = async (_,args) => {
+  const person = await MongoOrb("Person").collection.findOne({_id:args._id})
+  const friends = await MongoOrb("Person").collection.find({
+    _id:{
+      $in: person.friends
+    }
+  }).toArray()
+  const friendsOfFriends = await MongoOrb("Person").collection.find({
+    _id:{
+      $in: friends.flatMap(f => f.friends)
+    }
+  })
+  const allPeople = Object.fromEntries([person,...friends,friendsOfFriends].map(p => ([p.id,p])))
+  return peopleLoader.withData(person,allPeople) 
+}
+
+export const PersonFriends = (src,args) =>{
+  const source = peopleLoader.fromSrc(src)
+  return {
+    ...src,
+    friends: src.friends.map(f => source.__dataLoader[f])
+  }
+}
+```
