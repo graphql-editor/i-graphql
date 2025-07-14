@@ -10,7 +10,7 @@ export const mc = async (props: {
   if (mongoConnection) {
     return Promise.resolve(mongoConnection);
   }
-  const resolvedMongoUrl = mongoUrl || process.env.MONGO_URL;
+  const resolvedMongoUrl = mongoUrl || tryToCreateMongoUrl();
   let client: MongoClient | undefined = mongoClient;
   if (resolvedMongoUrl && !client) {
     client = new MongoClient(resolvedMongoUrl, {
@@ -32,4 +32,16 @@ export const mc = async (props: {
   };
   await afterConnection?.(db);
   return mongoConnection;
+};
+
+export const tryToCreateMongoUrl = () => {
+  if (process.env.MONGO_URL) return process.env.MONGO_URL;
+  if (
+    !process.env.MONGO_PASSWORD ||
+    !process.env.MONGO_USERNAME ||
+    !process.env.MONGO_DATABASE ||
+    !process.env.MONGO_HOSTNAME
+  )
+    return '';
+  return `mongodb+srv://${process.env.MONGO_USERNAME}:${process.env.MONGO_PASSWORD}@${process.env.MONGO_HOSTNAME}/${process.env.MONGO_DATABASE}?retryWrites=true&w=majority`;
 };
