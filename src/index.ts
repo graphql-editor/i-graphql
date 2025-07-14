@@ -17,9 +17,10 @@ export const iGraphQL = async <
   afterConnection?: (database: Db) => void;
   // override the process.env.MONGO_URL variable
   mongoClient?: MongoClient;
+  mongoUrl?: string;
 }) => {
-  const { autoFields, afterConnection, mongoClient } = props;
-  const { db } = await mc({ afterConnection, mongoClient });
+  const { autoFields, afterConnection, mongoClient, mongoUrl } = props;
+  const { db } = await mc({ afterConnection, mongoClient, mongoUrl });
   clearPromises();
   return <T extends keyof IGraphQL>(k: T) => {
     type O = IGraphQL[T];
